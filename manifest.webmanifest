@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Campus Finds — Lost & Found",
+  "short_name": "Campus Finds",
+  "description": "Report, search, and reunite lost items on campus.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f6f5f0",
+  "theme_color": "#172b25",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

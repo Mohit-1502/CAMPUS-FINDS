@@ -10,7 +10,7 @@
     {id:'demo-6',type:'lost',title:'USB-C charger',category:'Electronics',description:'White 65W wall charger with two ports.',location:'Computer lab 3',date:daysAgo(5),contact:'student@example.edu',status:'returned',demo:true}
   ];
   const $ = (s, root=document) => root.querySelector(s), $$ = (s, root=document) => [...root.querySelectorAll(s)];
-  const grid = $('#listing-grid'), dialog = $('#report-dialog'), form = $('#report-form');
+  const grid = $('#listing-grid'), dialog = $('#report-dialog'), form = $('#report-form'), contactDialog = $('#contact-dialog');
   let filter = 'all', toastTimer, selectedPhoto = '';
   function load() {
     try { const saved = localStorage.getItem(KEY); if (saved !== null) { const value = JSON.parse(saved); if (Array.isArray(value)) return value; } }
@@ -26,10 +26,23 @@
     if (+date === +today) return 'Today'; if (+date === +yesterday) return 'Yesterday';
     return new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short'}).format(date);
   }
-  function contactUrl(value) {
-    const s = String(value || '').trim();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return `mailto:${s}`;
-    const digits = s.replace(/[^\d+]/g,''); return digits.length >= 7 ? `tel:${digits}` : `mailto:${s}`;
+  function openContact(item) {
+    const role = item.type === 'lost' ? 'owner' : 'finder';
+    const value = String(item.contact || '').trim();
+    const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    $('#contact-title').textContent = `Contact ${role}`;
+    $('#contact-item-title').textContent = item.title;
+    if (email) {
+      const subject = encodeURIComponent(`Campus Finds: ${item.title}`);
+      const body = encodeURIComponent(`Hi, I saw your Campus Finds listing for “${item.title}”. I think I can help. I can describe a detail or show proof in person at a safe campus location.`);
+      $('#contact-details').innerHTML = `<span class="contact-value">${esc(value)}</span><a class="button dark contact-action" href="mailto:${esc(value)}?subject=${subject}&amp;body=${body}">Email ${role} ↗</a>`;
+    } else {
+      const digits = value.replace(/\D/g, '');
+      const phone = `${value.trim().startsWith('+') ? '+' : ''}${digits}`;
+      const message = encodeURIComponent(`Hi, I saw your Campus Finds listing for “${item.title}”. I think it may be mine. I can describe a detail or show proof in person at a safe campus location.`);
+      $('#contact-details').innerHTML = `<span class="contact-value">${esc(value)}</span><div class="contact-actions"><a class="button dark contact-action" href="tel:${esc(phone)}">Call ${role} ↗</a><a class="button contact-message" href="sms:${esc(phone)}?body=${message}">Text ${role}</a></div>`;
+    }
+    contactDialog.showModal();
   }
   function clearPhoto() {
     selectedPhoto = '';
@@ -73,7 +86,7 @@
     const done = item.status === 'returned', kind = done ? 'returned' : item.type;
     const label = done ? 'Reunited' : item.type;
     const contactText = item.type === 'lost' ? 'Contact owner ↗' : 'Contact finder ↗';
-    const action = done ? '<span class="listing-date">Happily reunited</span>' : `<a class="contact-link" href="${esc(contactUrl(item.contact))}">${contactText}</a><button class="returned-button" type="button" data-return="${esc(item.id)}">Mark returned</button>`;
+    const action = done ? '<span class="listing-date">Happily reunited</span>' : `<button class="contact-link" type="button" data-contact="${esc(item.id)}">${contactText}</button><button class="returned-button" type="button" data-return="${esc(item.id)}">Mark returned</button>`;
     const photo = typeof item.photo === 'string' && item.photo.startsWith('data:image/jpeg;base64,') ? `<img class="listing-photo" loading="lazy" src="${esc(item.photo)}" alt="Photo of ${esc(item.title)}">` : '';
     return `<article class="listing-card">${photo}<div class="listing-top"><span class="badge badge-${kind}">${label}</span><span class="category-label">${esc(item.category)}</span></div><h3>${esc(item.title)}</h3><p class="listing-description">${esc(item.description || 'No extra details added.')}</p><div class="listing-meta"><span class="pin">⌖</span><span>${esc(item.location)}</span></div><div class="listing-foot"><span class="listing-date">${dateLabel(item.date)}${item.demo ? ' · sample' : ''}</span><div class="card-actions">${action}</div></div></article>`;
   }
@@ -130,12 +143,20 @@
   });
   $('#search-input').addEventListener('input',render); $('#category-filter').addEventListener('change',render); $('#sort-order').addEventListener('change',render);
   $$('.filter-chip').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter; $$('.filter-chip').forEach(chip=>{const on=chip===button;chip.classList.toggle('selected',on);chip.setAttribute('aria-pressed',String(on));});render();}));
-  grid.addEventListener('click',e=>{const button=e.target.closest('[data-return]');if(!button)return;const item=listings.find(x=>x.id===button.dataset.return);if(!item)return;item.status='returned';if(!save()){item.status='active';return;}render();toast('Marked as reunited. Thanks for helping!');});
+  $('#close-contact').addEventListener('click',()=>contactDialog.close());
+  contactDialog.addEventListener('click',e=>{if(e.target===contactDialog)contactDialog.close();});
+  grid.addEventListener('click',e=>{
+    const contactButton=e.target.closest('[data-contact]');
+    if(contactButton){const item=listings.find(x=>x.id===contactButton.dataset.contact);if(item)openContact(item);return;}
+    const button=e.target.closest('[data-return]');if(!button)return;const item=listings.find(x=>x.id===button.dataset.return);if(!item)return;item.status='returned';if(!save()){item.status='active';return;}render();toast('Marked as reunited. Thanks for helping!');
+  });
   form.addEventListener('submit',e=>{
     e.preventDefault(); $$('.field',form).forEach(x=>x.classList.remove('has-error')); $('#form-error').textContent='';
     const data=new FormData(form); let invalid=null;
     ['title','category','date','location','contact'].forEach(name=>{const control=form.elements[name];if(!String(data.get(name)||'').trim()){const field=control.closest('.field');field.classList.add('has-error');const message=$('.field-error',field);if(message)message.textContent='Please fill in this field.';invalid ||= control;}});
     const date=String(data.get('date')||''); if(date>daysAgo(0)){ $('#form-error').textContent='Please choose today or an earlier date.'; invalid ||= form.elements.date; }
+    const contactValue=String(data.get('contact')||'').trim(), validEmail=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactValue), validPhone=contactValue.replace(/\D/g,'').length>=7;
+    if(contactValue&&!validEmail&&!validPhone){const control=form.elements.contact,field=control.closest('.field');field.classList.add('has-error');$('.field-error',field).textContent='Enter a valid email address or phone number.';invalid ||= control;}
     if(invalid){invalid.focus();return;}
     listings.unshift({id:globalThis.crypto?.randomUUID?.()||`item-${Date.now()}`,type:data.get('type'),title:String(data.get('title')).trim(),category:data.get('category'),date,location:String(data.get('location')).trim(),description:String(data.get('description')||'').trim(),contact:String(data.get('contact')).trim(),photo:selectedPhoto,status:'active',demo:false});
     if(!save()){listings.shift();return;} dialog.close(); filter='all'; $$('.filter-chip').forEach(chip=>{const on=chip.dataset.filter==='all';chip.classList.toggle('selected',on);chip.setAttribute('aria-pressed',String(on));}); $('#search-input').value='';$('#category-filter').value='all';render();toast('Your listing is on the board.');$('#listings').scrollIntoView({behavior:'smooth'});

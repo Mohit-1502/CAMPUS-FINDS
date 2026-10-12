@@ -1,4 +1,4 @@
-const CACHE = 'campus-finds-v3';
+const CACHE = 'campus-finds-v4';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
